@@ -7,10 +7,7 @@ import { sessionRepository } from "../repositories/session.repository.js";
 import ApiError from "../errors/errorHelper.js";
 import { date, jwt } from "zod";
 import config from "../config/index.js";
-
-
-
-
+import { hashService } from "../lib/utils/hash.service.js";
 
 class AuthService {
 
@@ -21,19 +18,13 @@ class AuthService {
 
             mongoSession.startTransaction();
 
-            // Check Existing User
-
             const existingUser = await userRepository.findByEmail(payload.email);
 
             if (existingUser) {
                 throw new ApiError(400, "Email already exists.")
             }
 
-            // Hash Password
-
             const passwordHash = await passwordService.hash(payload.password);
-
-            // Create User
 
             const user = await userRepository.create(
                 {
@@ -46,168 +37,165 @@ class AuthService {
 
             );
 
-            // -----------------------------
-            // Generate Session Id
-
-
             const sessionId = new mongoose.Types.ObjectId();
 
-            // -----------------------------
-            // Generate Tokens
-            // -----------------------------
+            const accessToken = jwtService.generateAccessToken({
+                userId: user._id.toString(),
+                sessionId: sessionId.toString(),
+                role: user.role,
+            });
 
-            const accessToken =
-                jwtService.generateAccessToken({
+            const refreshToken = jwtService.generateRefreshToken({
+                userId: user._id.toString(),
+                sessionId: sessionId.toString(),
+            });
 
-                    userId: user._id.toString(),
+            const refreshTokenHash = hashService.hashSha256(refreshToken)
 
-                    sessionId:
-                        sessionId.toString(),
-
-                    role: user.role,
-
-                });
-
-            const refreshToken =
-                jwtService.generateRefreshToken({
-
-                    userId: user._id.toString(),
-
-                    sessionId:
-                        sessionId.toString(),
-
-                });
-
-            // -----------------------------
-            // Hash Refresh Token
-            // -----------------------------
-
-            const refreshTokenHash =
-                crypto
-
-                    .createHash("sha256")
-
-                    .update(refreshToken)
-
-                    .digest("hex");
-
-            // -----------------------------
-            // Create Session
-            // -----------------------------
             const decode = jwtService.decodeToken(accessToken)
 
-            // const expireDate = new Date(
-            //     Date.now() + parseInt(config.auth.refreshExpires) * 24 * 60 * 60 * 1000
-            // );
-
             await sessionRepository.create(
-
                 {
-
                     _id: sessionId,
-
                     userId: user._id,
-
                     refreshToken: refreshTokenHash,
-
                     jti: decode.jti,
-
-                    browser:
-                        payload.browser,
-
-                    operatingSystem:
-                        payload.operatingSystem,
-
-                    platform:
-                        payload.platform,
-
-                    userAgent:
-                        payload.userAgent,
-
-                    ipAddress:
-                        payload.ipAddress,
-
-                    expiresAt: new Date( Date.now() + parseInt(config.auth.refreshExpires) * 24 * 60 * 60 * 1000),
+                    browser: payload.browser,
+                    operatingSystem: payload.operatingSystem,
+                    platform: payload.platform,
+                    userAgent: payload.userAgent,
+                    ipAddress: payload.ipAddress,
+                    expiresAt: new Date(Date.now() + parseInt(config.auth.refreshExpires) * 24 * 60 * 60 * 1000),
                 },
-
-                {
-
-                    session:
-                        mongoSession,
-
-                }
-
+                { session: mongoSession }
             );
 
-            // -----------------------------
-            // Commit Transaction
-            // -----------------------------
 
             await mongoSession.commitTransaction();
 
-            return {
+            return { user, accessToken, refreshToken };
 
-                user,
-
-                accessToken,
-
-                refreshToken,
-
-            };
-
-        }
-
-        catch (error) {
-
+        } catch (error) {
             await mongoSession.abortTransaction();
-
             throw error;
-
         }
-
         finally {
-
             mongoSession.endSession();
-
         }
 
     }
 
     async login(payload) {
 
-        const user =
-            await userRepository.findByEmailWithPassword(
-                payload.email
-            );
-
+        const user = await userRepository.findByEmailWithPassword(payload.email);
         if (!user) {
-
-            throw new ApiError(
-                400,
-                "Invalid credentials."
-            );
-
+            throw new ApiError(400, "Invalid credentials.");
         }
 
-        const passwordMatched =
-            await passwordService.compare(
-
-                payload.password,
-
-                user.passwordHash
-
-            );
+        const passwordMatched = await passwordService.compare(payload.password, user.passwordHash);
 
         if (!passwordMatched) {
-
-            throw new ApiError(
-                400,
-                "Invalid credentials."
-            );
+            throw new ApiError(400, "Invalid credentials.");
 
         }
 
-        // Login flow continues...
+        const mongoSession = await mongoose.startSession();
+        try {
+            await mongoSession.startTransaction();
+            const sessionId = new mongoose.Types.ObjectId()
+            const accessToken = jwtService.generateAccessToken({ userId: user._id.toString(), sessionId, role: user.role })
+
+            const refreshToken = jwtService.generateRefreshToken({ userId: user._id.toString(), sessionId })
+            const refreshTokenHash = hashService.hashSha256(refreshToken)
+            const decode = jwtService.decodeToken(refreshToken)
+
+            await sessionRepository.create(
+                {
+                    _id: sessionId,
+                    userId: user._id,
+                    refreshToken: refreshTokenHash,
+                    jti: decode.jti,
+                    deviceId: payload.deviceId,
+                    browser: payload.browser,
+                    operatingSystem: payload.operatingSystem,
+                    platform: payload.platform,
+
+                    userAgent: payload.userAgent,
+                    ipAddress: payload.ipAddress,
+
+                    expiresAt: new Date(Date.now() + parseInt(config.auth.refreshExpires) * 24 * 60 * 60 * 1000),
+                },
+                {
+                    session: mongoSession,
+                }
+            );
+            await mongoSession.commitTransaction()
+
+            return {
+
+                user: {
+                    id: user._id,
+                    firstName: user.firstName,
+                    lastName: user.lastName,
+                    email: user.email,
+                    role: user.role,
+                },
+                accessToken,
+                refreshToken,
+
+            };
+        } catch (error) {
+            await mongoSession.abortTransaction()
+            throw error
+        } finally {
+            await mongoSession.endSession()
+        }
+
+    }
+
+    async refresh(refreshToken) {
+        const payload = jwtService.verifyRefreshToken(refreshToken)
+
+        const { sub, sid, jti } = payload;
+        const user = await userRepository.findById(sub);
+
+        const mongoSession = await mongoose.startSession();
+        try {
+            await mongoSession.startTransaction();
+            const session = await sessionRepository.findById(sid)
+            if (!session) {
+                throw new ApiError(400, 'session not found')
+            }
+            
+            const incomingRTHash = hashService.hashSha256(refreshToken)
+
+            if (incomingRTHash !== session.refreshToken) {
+                throw new ApiError(400, "Refresh token reuse detected.")
+            }
+
+            const accessToken = jwtService.generateAccessToken({ userId: sub, sessionId: sid, role: user.role })
+            const newRefreshToken = jwtService.generateRefreshToken({ userId: sub, sessionId: sid })
+
+            const decode = jwtService.decodeToken(newRefreshToken)
+            const newRThash = hashService.hashSha256(newRefreshToken)
+
+            await sessionRepository.updateRefreshToken({ sessionId: sid, refreshTokenHash: newRThash, jti: decode.jti, expiresAt: new Date(Date.now() + parseInt(config.auth.refreshExpires) * 24 * 60 * 60 * 1000), }, {
+                session: mongoSession,
+            })
+
+            await mongoSession.commitTransaction()
+
+            return {
+                accessToken,
+                refreshToken: newRefreshToken
+            }
+
+        } catch (error) {
+            await mongoSession.abortTransaction()
+            throw error
+        } finally {
+            await mongoSession.endSession()
+        }
     }
 
 }

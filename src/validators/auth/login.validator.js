@@ -7,10 +7,10 @@ export const loginSchema = z.object({
     email: z
         .email()
         .trim()
-        .toLowerCase(),
+        .toLowerCase().trim(),
 
     password: z
         .string()
-        .min(1),
+        .min(1).trim(),
 
 }).strict();

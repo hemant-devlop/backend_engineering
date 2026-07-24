@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 
 import config from '../../config/index.js'
+import ApiError from '../../errors/errorHelper.js';
 
 
 class JwtService {
@@ -26,7 +27,15 @@ class JwtService {
             return jwt.verify(token, config.auth.refreshToken);
         }
         catch {
-            console.log('"Invalid refresh token."')///
+            throw new ApiError(401,'Invalid refresh token.')///
+        }
+    }
+    verifyAccessToken(token) {
+        try {
+            return jwt.verify(token, config.auth.accessToken);
+        }
+        catch {
+            throw new ApiError(401,'Invalid refresh token.')///
         }
     }
     decodeToken(token) {

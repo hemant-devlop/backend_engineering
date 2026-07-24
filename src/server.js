@@ -1,11 +1,11 @@
 import express from "express";
-
+import cookieParser from "cookie-parser";
 import { database } from "./lib/database/index.js";
 import authRoutes from './routes/auth.route.js'
 import errorMiddleware from "./middlewares/error.middleware.js";
 const app = express();
 app.use(express.json());
-
+app.use(cookieParser())
 app.get('/', (req, res) => {
     res.send('Welcome to the Home Page!');
 });
