@@ -32,3 +32,19 @@ export const AUTH_PROVIDER = Object.freeze({
     GITHUB: "GITHUB",
 
 });
+
+export const SessionRevocationReason = Object.freeze({
+
+    USER_LOGOUT: "USER_LOGOUT",
+
+    LOGOUT_ALL: "LOGOUT_ALL",
+
+    PASSWORD_CHANGED: "PASSWORD_CHANGED",
+
+    ACCOUNT_DISABLED: "ACCOUNT_DISABLED",
+
+    TOKEN_REUSE: "TOKEN_REUSE",
+
+    ADMIN_FORCED: "ADMIN_FORCED",
+
+});

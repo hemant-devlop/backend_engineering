@@ -8,6 +8,7 @@ import ApiError from "../errors/errorHelper.js";
 import { date, jwt } from "zod";
 import config from "../config/index.js";
 import { hashService } from "../lib/utils/hash.service.js";
+import { SessionRevocationReason } from "../constants/user.constants.js";
 
 class AuthService {
 
@@ -196,6 +197,12 @@ class AuthService {
         } finally {
             await mongoSession.endSession()
         }
+    }
+
+    async logout(sessionId){
+        await sessionRepository.revoke(sessionId,SessionRevocationReason.USER_LOGOUT)
+
+        return ;
     }
 
 }

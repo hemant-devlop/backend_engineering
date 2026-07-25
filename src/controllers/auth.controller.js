@@ -95,5 +95,18 @@ class AuthController {
             }
         })
     }
+
+    logout=async(req,res)=>{
+        await authService.logout(req.session._id)
+
+        cookieService.clearAccessToken(res)
+        cookieService.clearRefreshToken(res)
+
+        return res.status(200).json({
+            success:true,
+            message: "Logged out successfully.",
+            data:null
+        })
+    }
 }
 export const authController = new AuthController();
