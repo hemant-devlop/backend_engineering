@@ -33,6 +33,7 @@ class AuthController {
 
     };
     login = async (req, res) => {
+        console.log(req.headers["user-agent"])
         const result = await authService.login({
             ...req.validated.body,
 
@@ -44,7 +45,17 @@ class AuthController {
         cookieService.setAccessToken(res, result.accessToken)
         cookieService.setRefreshToken(res, result.refreshToken)
 
-        res.status(200).json({
+        if (req.headers["user-agent"] === 'x-user/app') {
+            return res.status(200).json({
+                success: true,
+                message: "Login successfully.",
+                data: {
+                    user: {...result.user,accessToken:result.accessToken,refreshToken:result.refreshToken},
+                },
+            });
+        }
+
+        return res.status(200).json({
             success: true,
             message: "Login successfully.",
             data: {
@@ -57,7 +68,7 @@ class AuthController {
     refresh = async (req, res) => {
         const refreshToken = req.cookies.refreshToken
         if (!refreshToken) {
-            res.status(401).json({
+            return res.status(401).json({
                 success: false,
                 message: "Refresh token Required",
                 error: ''
@@ -70,7 +81,7 @@ class AuthController {
         cookieService.setAccessToken(res, result.accessToken)
         cookieService.setRefreshToken(res, result.refreshToken)
 
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             message: "refresh successfully.",
             data: null,
@@ -83,29 +94,41 @@ class AuthController {
             success: true,
             message: 'user found',
             data: {
-                 id:req.user._id,
+                id: req.user._id,
 
-                email:req.user.email,
+                email: req.user.email,
 
-                role:req.user.role,
+                role: req.user.role,
 
-                browser:req.session.browser,
+                browser: req.session.browser,
 
-                ip:req.session.ipAddress
+                ip: req.session.ipAddress
             }
         })
     }
 
-    logout=async(req,res)=>{
+    logout = async (req, res) => {
         await authService.logout(req.session._id)
 
         cookieService.clearAccessToken(res)
         cookieService.clearRefreshToken(res)
 
         return res.status(200).json({
-            success:true,
+            success: true,
             message: "Logged out successfully.",
-            data:null
+            data: null
+        })
+    }
+    logoutAll = async (req, res) => {
+        await authService.logoutAll(req.user._id)
+
+        cookieService.clearAccessToken(res)
+        cookieService.clearRefreshToken(res)
+
+        return res.status(200).json({
+            success: true,
+            message: "Logged out all successfully.",
+            data: null
         })
     }
 }

@@ -15,12 +15,11 @@ router.post("/register",validate({body:registerSchema}),asyncHandler(authControl
 router.post("/login",validate({body:loginSchema}),asyncHandler(authController.login));
 
 router.post("/refresh",protect,asyncHandler(authController.refresh));//not done
+
 router.get("/user",protect,asyncHandler(authController.user));//not done
 
 router.post("/logout",protect,asyncHandler(authController.logout));
 
-// router.post("/logout-all",authenticationMiddleware,authController.logoutAll);
-
-// router.get("/me",authenticationMiddleware,authController.me);
+router.post("/logout-all",protect,asyncHandler(authController.logoutAll));
 
 export default router;

@@ -132,6 +132,7 @@ class AuthService {
             );
             await mongoSession.commitTransaction()
 
+            
             return {
 
                 user: {
@@ -203,6 +204,10 @@ class AuthService {
         await sessionRepository.revoke(sessionId,SessionRevocationReason.USER_LOGOUT)
 
         return ;
+    }
+    async logoutAll(userId){
+        await sessionRepository.revokeAllByUserId(userId,SessionRevocationReason.LOGOUT_ALL)
+        return;
     }
 
 }
