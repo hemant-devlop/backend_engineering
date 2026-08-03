@@ -1,36 +1,34 @@
-import express from "express";
-import cookieParser from "cookie-parser";
+
+import http from 'http'
+import app from "./app.js";
+import config from "./config/index.js";
 import { database } from "./lib/database/index.js";
-import authRoutes from './routes/auth.route.js'
-import errorMiddleware from "./middlewares/error.middleware.js";
-const app = express();
-app.use(express.json());
-app.use(cookieParser())
-app.get('/', (req, res) => {
-    res.send('Welcome to the Home Page!');
-});
+// import logger from "./lib/logger/index.js";//pending
 
-app.use('/api/v1/',authRoutes)
-app.use(errorMiddleware)
+const server = http.createServer(app);
 
-async function startServer() {
+async function bootstrap() {
 
-    try {
-        await database.initialize();
+    await database.initialize();
 
-        app.listen(5000, () => {
-            console.log("Server Started 5000");
-        });
+    await new Promise((resolve) => {
+        server.listen(config.app.port, resolve);
+    });
 
-    }
-    catch (error) {
-
-        console.error(error);
-
-        process.exit(1);
-
-    }
+    console.log({
+        event: "APPLICATION_STARTED",
+        port: config.app.port,
+        environment: config.app.env,
+        processId: process.pid,
+        nodeVersion: process.version,
+    });
 
 }
 
-startServer();
+bootstrap().catch((error) => {
+
+    console.log(error)
+
+    process.exit(1);
+
+});
