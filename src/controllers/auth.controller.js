@@ -33,7 +33,7 @@ class AuthController {
 
     };
     login = async (req, res) => {
-        console.log(req.headers["user-agent"])
+        // console.log(req.headers["user-agent"])
         const result = await authService.login({
             ...req.validated.body,
 
